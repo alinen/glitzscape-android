@@ -204,7 +204,7 @@ public class HexBoard {
             }
             y += mR;
         }
-        /*
+
         mBridgeGeometry = new int[mNumHex][6]; // map between idx and starting geometry ID of bridges in each direction
         for (int idx = 0; idx < mNumHex; idx++)
         {
@@ -247,7 +247,6 @@ public class HexBoard {
                 addVertex(p2.x, p2.y, 0, vertexList, textureList, colorList);
             }
         }
-        */
 
         mVertexId = initBuffer(vertexList, mVertexBuffer, GLES20.GL_STATIC_DRAW);
         mColorId = initBuffer(colorList, mColorBuffer, GLES20.GL_DYNAMIC_DRAW);
