@@ -1,6 +1,7 @@
 package org.whatevers.alinen.glitzscape;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.opengl.GLSurfaceView;
 import android.view.MotionEvent;
 import android.util.Log;
@@ -18,8 +19,10 @@ public class MyGLSurfaceView extends GLSurfaceView {
         super(context);
         setEGLContextClientVersion(2);
 
-        mRenderer = new MyGLRenderer();
+        AssetManager mgr = context.getAssets();
+        mRenderer = new MyGLRenderer(mgr);
         setRenderer(mRenderer);
+
     }
 
     @Override

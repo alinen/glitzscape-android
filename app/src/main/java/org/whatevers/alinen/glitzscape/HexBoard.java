@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+
+import android.content.res.AssetManager;
 import android.util.Log;
 import android.opengl.Matrix;
 import android.opengl.GLES20;
@@ -22,24 +24,38 @@ public class HexBoard {
     protected float mUniformScale;
     protected int mShader;
     protected int mPositionHandle;
+    protected int mUVHandle;
+    protected int mColorHandle;
     protected int mMVMatHandle;
     protected int mPMatHandle;
+    protected int mTimeHandle;
+    protected int mSamplerHandle;
     protected int mPrimitive;
 
     private final String vertexShaderCode =
-            "uniform mat4 uMVMatrix;" +
-            "uniform mat4 uPMatrix;" +
-            "attribute vec3 vPosition;" +
-            "void main() {" +
-            "  gl_Position = uPMatrix * uMVMatrix * vec4(vPosition,1);" +
-            "}";
+            "attribute vec3 aPosition;\n" +
+            "attribute vec2 aTextureCoord;\n" +
+            "attribute vec4 aColor;\n" +
+            "uniform mat4 uMVMatrix;\n" +
+            "uniform mat4 uPMatrix;\n" +
+            "varying vec2 vTextureCoord;\n" +
+            "varying vec4 vColor;\n" +
+            "void main() {\n" +
+            "  gl_Position = uPMatrix * uMVMatrix * vec4(aPosition,1.0);\n" +
+            "  vTextureCoord = aTextureCoord;\n" +
+            "  vColor = aColor;\n"+
+            "}\n";
 
     private final String fragmentShaderCode =
-            "precision mediump float;" +
-            "uniform vec4 vColor;" +
-            "void main() {" +
-            "  gl_FragColor = vec4(1,1,1,1);" +
-            "}";
+            "precision mediump float;\n" +
+            "varying vec2 vTextureCoord;\n" +
+            "varying vec4 vColor;\n" +
+            "uniform sampler2D uSampler;\n" +
+            "uniform float uT;\n" +
+            "void main() {\n" +
+            "  vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s+uT, vTextureCoord.t));\n" +
+            "  gl_FragColor = vColor * textureColor;\n" +
+            "}\n";
 
     static final Neighbor NE = new Neighbor(0, new Vector3D( 0.866f, 0.500f), new Cell( 1, 1));
     static final Neighbor N  = new Neighbor(1, new Vector3D( 0.000f, 1.000f), new Cell( 2, 0));
@@ -121,13 +137,28 @@ public class HexBoard {
         int vertexShader = LoadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode);
         int fragmentShader = LoadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode);
 
+        Log.d("GLITZ", vertexShaderCode);
+        Log.d("GLITZ", fragmentShaderCode);
+
         mShader = GLES20.glCreateProgram();
         GLES20.glAttachShader(mShader, vertexShader);
         GLES20.glAttachShader(mShader, fragmentShader);
-        GLES20.glLinkProgram(mShader);
 
-        GLES20.glUseProgram(mShader);
-        mPositionHandle = GLES20.glGetAttribLocation(mShader, "vPosition");
+        GLES20.glLinkProgram(mShader);
+        int[] linkStatus = new int[1];
+        GLES20.glGetProgramiv(mShader, GLES20.GL_LINK_STATUS, linkStatus, 0);
+        if (linkStatus[0] != GLES20.GL_TRUE)
+        {
+            Log.e("GLITZ", "Could not link compile program: ");
+            Log.e("GLITZ", GLES20.glGetProgramInfoLog(mShader));
+        }
+
+        mPositionHandle = GLES20.glGetAttribLocation(mShader, "aPosition");
+        mColorHandle = GLES20.glGetAttribLocation(mShader, "aColor");
+        mUVHandle = GLES20.glGetAttribLocation(mShader, "aTextureCoord");
+
+        mTimeHandle = GLES20.glGetUniformLocation(mShader, "uT");
+        mSamplerHandle = GLES20.glGetUniformLocation(mShader, "uSampler");
         mMVMatHandle = GLES20.glGetUniformLocation(mShader, "uMVMatrix");
         mPMatHandle = GLES20.glGetUniformLocation(mShader, "uPMatrix");
     }
@@ -135,7 +166,6 @@ public class HexBoard {
     int initBuffer(ArrayList<Float> data, FloatBuffer buffer, int type) {
         ByteBuffer bb = ByteBuffer.allocateDirect(data.size() * 4);
         bb.order(ByteOrder.nativeOrder());
-        buffer = bb.asFloatBuffer();
         for (int i = 0; i < data.size(); i++) {
             Float f = data.get(i);
             if (f == null)
@@ -170,7 +200,7 @@ public class HexBoard {
         textureList.add((py+mBoardSize)/(2*mBoardSize));
 
         colorList.add(1.0f);
-        colorList.add(1.0f);
+        colorList.add(0.0f);
         colorList.add(1.0f);
         colorList.add(1.0f);
     }
@@ -205,6 +235,7 @@ public class HexBoard {
             y += mR;
         }
 
+        /*
         mBridgeGeometry = new int[mNumHex][6]; // map between idx and starting geometry ID of bridges in each direction
         for (int idx = 0; idx < mNumHex; idx++)
         {
@@ -247,6 +278,11 @@ public class HexBoard {
                 addVertex(p2.x, p2.y, 0, vertexList, textureList, colorList);
             }
         }
+        */
+
+        mVertexBuffer = FloatBuffer.allocate(vertexList.size());
+        mColorBuffer = FloatBuffer.allocate(colorList.size());
+        mUVBuffer = FloatBuffer.allocate(textureList.size());
 
         mVertexId = initBuffer(vertexList, mVertexBuffer, GLES20.GL_STATIC_DRAW);
         mColorId = initBuffer(colorList, mColorBuffer, GLES20.GL_DYNAMIC_DRAW);
@@ -254,7 +290,8 @@ public class HexBoard {
         mNumVertices = vertexList.size() / 3;
         mColorDynamic = true;
         mPrimitive = GLES20.GL_TRIANGLES;
-        Log.d("GLITZ", "Init board: " + mNumRows + " " + mNumCols + " " + mNumHex + " "+ mNumVertices);
+        Log.d("GLITZ", "Init board: " + mNumRows + " " + mNumCols + " " + mNumHex + " "+ mNumVertices +
+                " colors: "+colorList.size()+" uv: "+ textureList.size()+" vertex: "+vertexList.size());
     }
 
     static int LoadShader(int type, String shaderSource)
@@ -262,6 +299,12 @@ public class HexBoard {
         int shader = GLES20.glCreateShader(type);
         GLES20.glShaderSource(shader, shaderSource);
         GLES20.glCompileShader(shader);
+        int compiled[] = new int[1];
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0);
+        if (compiled[0] == 0) {
+            Log.e("GLITZ", "Could not compile shader " + type + ":");
+            Log.e("GLITZ", GLES20.glGetShaderInfoLog(shader));
+        }
         return shader;
     }
 
@@ -299,35 +342,36 @@ public class HexBoard {
         mvScale(mUniformScale);
     }
 
-    void draw(float dt, float[] pmatrix) {
+    void draw(float time, float[] pmatrix, int textureId) {
         if (!mEnabled) return;
         //mvPushMatrix();
 
         //_applyTransforms();
 
         GLES20.glUseProgram(mShader);
-        GLES20.glEnableVertexAttribArray(mPositionHandle);
 
+        GLES20.glEnableVertexAttribArray(mPositionHandle);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mVertexId);
         if (mVertexDynamic) GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, mVertexBuffer.capacity() * 4, mVertexBuffer, GLES20.GL_DYNAMIC_DRAW);
         GLES20.glVertexAttribPointer(mPositionHandle, 3, GLES20.GL_FLOAT, false, 0, 0);
 
-        /*
+        GLES20.glEnableVertexAttribArray(mUVHandle);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mUVId);
         if (mUVDynamic) GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, mUVBuffer.capacity() * 4, mUVBuffer, GLES20.GL_DYNAMIC_DRAW);
         GLES20.glVertexAttribPointer(mUVHandle, 2, GLES20.GL_FLOAT, false, 0, 0);
 
+        GLES20.glEnableVertexAttribArray(mColorHandle);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, mColorId);
         if (mColorDynamic) GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, mColorBuffer.capacity() * 4, mColorBuffer, GLES20.GL_DYNAMIC_DRAW);
         GLES20.glVertexAttribPointer(mColorHandle, 4, GLES20.GL_FLOAT, false, 0, 0);
 
-        GLES20.activeTexture(GLES20.TEXTURE0);
-        GLES20.bindTexture(GLES20.TEXTURE_2D, obj.texture);
-        GLES20.uniform1i(obj.shader.samplerUniform, 0);
-*/
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
+        GLES20.glUniform1i(mSamplerHandle, 0);
+
         GLES20.glUniformMatrix4fv(mPMatHandle, 1, false, pmatrix, 0);
         GLES20.glUniformMatrix4fv(mMVMatHandle, 1, false, mvMatrix, 0);
-        // TODO GLES20.uniform1f(obj.shader.time, time);
+        GLES20.glUniform1f(mTimeHandle, time);
 
         GLES20.glDrawArrays(mPrimitive, 0, mNumVertices);
         //mvPopMatrix();
@@ -414,5 +458,7 @@ public class HexBoard {
 
         return true;
     }
+
+
 
 }
