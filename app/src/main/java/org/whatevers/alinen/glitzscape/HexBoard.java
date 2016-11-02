@@ -53,7 +53,7 @@ public class HexBoard {
             "uniform sampler2D uSampler;\n" +
             "uniform float uT;\n" +
             "void main() {\n" +
-            "  vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s+uT, vTextureCoord.t));\n" +
+            "  vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s + uT, vTextureCoord.t));\n" +
             "  gl_FragColor = vColor * textureColor;\n" +
             "}\n";
 

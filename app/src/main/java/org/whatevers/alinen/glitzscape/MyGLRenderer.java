@@ -28,7 +28,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private HexBoard mBoard;
     private AssetManager mAssetManager;
     private int mTextureId;
-    private Bitmap mBitmap;
 
     public MyGLRenderer(AssetManager mgr)
     {
@@ -42,9 +41,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         mBoard = new HexBoard(2.0f, WORLD_SIZE, 0.2f);
         mBoard.initBoard();
 
-        // load texture
-        mBitmap = loadTextureResource(mAssetManager, "stripesTest7.png");
-        mTextureId = initTexture(mBitmap, false);
+        mTextureId = initTextureFromFile(mAssetManager, "stripesTest7.png", false);
     }
 
     @Override
@@ -52,7 +49,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        float time = SystemClock.uptimeMillis() * 0.001f; // mm to s
+        float time = SystemClock.uptimeMillis() * 0.0001f; // mm to s
         float dt = time - mLastTime;
         mBoard.draw(time, mPMatrix, mTextureId);
         mLastTime = time;
@@ -74,25 +71,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureIds[0]);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_REPEAT);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_REPEAT);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-       /*
-        //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // asn: do I need this?
-        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA,
-                bitmap.getWidth(), bitmap.getHeight(), 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, bitmap.get);
-        if (mipmaps)
-        {
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST_MIPMAP_LINEAR);
-            GLES20.glGenerateMipmap(GLES20.GL_TEXTURE_2D);
-        }
-        else
-        {
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
-        }
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-        */
         return textureIds[0];
     }
 
